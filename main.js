@@ -334,42 +334,95 @@ function renderGroupStatusRow() {
 
 function renderSubmissionCards() {
   const count = storage.getGroupCount();
-  const all = storage.getAllSubmissions(count);
-  const filtered = state.facilitatorFilter === 'all'
-    ? all
-    : all.filter(s => s.caseKey === state.facilitatorFilter);
-
-  filtered.sort((a, b) => a.group - b.group);
-
+  const allSubs = storage.getAllSubmissions(count);
+  const casesToShow = state.facilitatorFilter === 'all' ? ['A', 'B', 'C'] : [state.facilitatorFilter];
   const container = document.getElementById('facilitator-cards');
 
-  if (filtered.length === 0) {
-    container.innerHTML = '<p class="empty-msg">아직 제출된 답변이 없습니다</p>';
-    return;
-  }
+  container.innerHTML = casesToShow.map(caseKey => {
+    const cd = CASES[caseKey];
+    const subs = allSubs.filter(s => s.caseKey === caseKey).sort((a, b) => a.group - b.group);
 
-  container.innerHTML = filtered.map(sub => {
-    const questions = CASES[sub.caseKey].questions;
-    const answers = sub.answers || {};
-    const qaHtml = questions
-      .filter(q => answers[q.label])
-      .map(q => `
-        <div class="sub-qa-item">
-          <span class="sub-q-label">${q.label}</span>
-          <p class="sub-q-answer">${escapeHtml(answers[q.label])}</p>
-        </div>
-      `).join('');
+    const mainQs = cd.questions.filter(q => !q.label.startsWith('추가'));
+    const extraQs = cd.questions.filter(q => q.label.startsWith('추가'));
+
+    const questionsHtml = `
+      <div class="f-q-list">
+        ${mainQs.map(q => `
+          <div class="f-q-item">
+            <span class="q-label">${q.label}</span>
+            <span class="q-text">${q.text}</span>
+          </div>
+        `).join('')}
+        ${extraQs.length ? `
+          <div class="extra-divider" style="margin:10px 0 10px">추가 토의</div>
+          ${extraQs.map(q => `
+            <div class="f-q-item">
+              <span class="q-label">${q.label}</span>
+              <span class="q-text">${q.text}</span>
+            </div>
+          `).join('')}
+        ` : ''}
+      </div>
+    `;
+
+    const subsHtml = subs.length === 0
+      ? '<p class="empty-sub-msg">아직 제출된 답변이 없습니다</p>'
+      : subs.map(sub => {
+          const answers = sub.answers || {};
+          const qaHtml = cd.questions
+            .filter(q => answers[q.label])
+            .map(q => `
+              <div class="sub-qa-item">
+                <span class="sub-q-label">${q.label}</span>
+                <p class="sub-q-answer">${escapeHtml(answers[q.label])}</p>
+              </div>
+            `).join('');
+          return `
+            <div class="submission-card">
+              <div class="sub-header">
+                <span class="sub-group">${sub.group}조</span>
+                <span class="sub-time">${formatTime(sub.submittedAt)}</span>
+              </div>
+              <div class="sub-qa-list">${qaHtml || '<p class="sub-empty">답변 없음</p>'}</div>
+            </div>
+          `;
+        }).join('');
+
     return `
-      <div class="submission-card">
-        <div class="sub-header">
-          <span class="sub-group">${sub.group}조</span>
-          <span class="sub-case">Case ${sub.caseKey}</span>
-          <span class="sub-time">${formatTime(sub.submittedAt)}</span>
+      <div class="case-section" id="f-case-${caseKey}">
+        <div class="case-section-hd" onclick="toggleCaseSection('${caseKey}')">
+          <div class="case-section-info">
+            <span class="case-section-badge">Case ${caseKey}</span>
+            <span class="case-section-title">${cd.subtitle}</span>
+            <span class="case-section-route">${cd.route}</span>
+          </div>
+          <span class="case-section-chevron">▾</span>
         </div>
-        <div class="sub-qa-list">${qaHtml || '<p class="sub-empty">답변 없음</p>'}</div>
+        <div class="case-section-body" id="f-case-body-${caseKey}">
+          <div class="f-block f-scenario-block">
+            <div class="f-block-label">시나리오</div>
+            <p class="f-scenario-text">${cd.scenario}</p>
+          </div>
+          <div class="f-block f-questions-block">
+            <div class="f-block-label">토의 질문</div>
+            ${questionsHtml}
+          </div>
+          <div class="f-block f-subs-block">
+            <div class="f-block-label f-subs-label">
+              제출 답변
+              <span class="f-sub-count">${subs.length}개</span>
+            </div>
+            ${subsHtml}
+          </div>
+        </div>
       </div>
     `;
   }).join('');
+}
+
+function toggleCaseSection(caseKey) {
+  const section = document.getElementById(`f-case-${caseKey}`);
+  section.classList.toggle('collapsed');
 }
 
 function startRefreshTimer() {
