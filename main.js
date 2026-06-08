@@ -12,7 +12,8 @@ const CASES = {
       { label: 'Q5', text: '승객(30C)에게 라면을 제공할 때, 여러분의 첫 마디는 무엇인가요?' },
       { label: '추가Q1', text: '다음 편에 같은 상황이 생기면 편조는 어떻게 움직여야 할까요?' },
       { label: '추가Q2', text: '객실브리핑 시 사전에 난기류 관련 서비스 운영 방식을 논의했다면 어떻게 달라졌을까요?' },
-    ]
+    ],
+    presQ: '난기류 상황에서 승객을 응대하는 우선 순위가 어떻게 달랐나요?'
   },
   B: {
     subtitle: '제 기내식 먼저 주시겠어요?',
@@ -26,7 +27,8 @@ const CASES = {
       { label: 'Q5', text: '승객(15A)에게 주류 판매를 거절한다면, 여러분의 응대 멘트는 무엇인가요?' },
       { label: '추가Q1', text: '승객(15A)이 하기 후 컴플레인을 넣겠다고 한다면 어떻게 대응하시겠어요?' },
       { label: '추가Q2', text: '여러분이 생각하는 기내에서 해결 가능한 것과 불가능한 것의 경계는 무엇일까요?' },
-    ]
+    ],
+    presQ: '각각의 상황에서 승객을 응대하는 첫 마디는 무엇이었나요?'
   },
   C: {
     subtitle: '이 상황은 무엇이 먼저이고, 어디까지 해드릴 수 있을까요?',
@@ -40,7 +42,8 @@ const CASES = {
       { label: 'Q5', text: '승객(24D)에게 응급 담요를 드리는 것은 허용 가능한 재량인가요, 조정 불가 영역인가요?' },
       { label: '추가Q1', text: "다수의 개별 요청 속에서 '잘 마무리된 서비스'로 만들려면 무엇이 필요할까요?" },
       { label: '추가Q2', text: '편조원들과의 소통에서 효과적인 방법에는 어떤 것들이 있을까요?' },
-    ]
+    ],
+    presQ: '사무장의 지시가 조원들마다 상이했나요? 어떻게 달랐고, 왜 달랐는지 이야기해주세요.'
   }
 };
 
@@ -286,6 +289,12 @@ function renderActivityContent() {
           ${extraQuestions.map(qaBlockHtml).join('')}
         </div>
       ` : ''}
+      ${cd.presQ ? `
+        <div class="extra-divider pres-divider">발표 질문</div>
+        <div class="qa-list">
+          ${qaBlockHtml({ label: '발표Q', text: cd.presQ })}
+        </div>
+      ` : ''}
     </div>
 
     <button id="btn-submit" class="btn-primary full-width submit-btn">${submitBtnLabel}</button>
@@ -390,6 +399,13 @@ function renderSubmissionCards() {
             </div>
           `).join('')}
         ` : ''}
+        ${cd.presQ ? `
+          <div class="extra-divider pres-divider" style="margin:10px 0 10px">발표 질문</div>
+          <div class="f-q-item">
+            <span class="q-label">발표Q</span>
+            <span class="q-text">${cd.presQ}</span>
+          </div>
+        ` : ''}
       </div>
     `;
 
@@ -397,14 +413,24 @@ function renderSubmissionCards() {
       ? '<p class="empty-sub-msg">아직 제출된 답변이 없습니다</p>'
       : subs.map(sub => {
           const answers = sub.answers || {};
-          const qaHtml = cd.questions
+          const allQs = [
+            ...cd.questions,
+            ...(cd.presQ ? [{ label: '발표Q', text: cd.presQ, isPres: true }] : [])
+          ];
+          const qaHtml = allQs
             .filter(q => answers[q.label])
-            .map(q => `
-              <div class="sub-qa-item">
-                <span class="sub-q-label">${q.label}</span>
-                <p class="sub-q-answer">${escapeHtml(answers[q.label])}</p>
-              </div>
-            `).join('');
+            .map((q, i, arr) => {
+              const divider = q.isPres
+                ? `<div class="extra-divider pres-divider" style="margin:8px 0 8px;font-size:10px">발표 질문</div>`
+                : (q.label === '추가Q1' ? `<div class="extra-divider" style="margin:8px 0 8px;font-size:10px">추가 토의</div>` : '');
+              return `
+                ${divider}
+                <div class="sub-qa-item">
+                  <span class="sub-q-label">${q.label}</span>
+                  <p class="sub-q-answer">${escapeHtml(answers[q.label])}</p>
+                </div>
+              `;
+            }).join('');
           return `
             <div class="submission-card">
               <div class="sub-header">
@@ -468,21 +494,33 @@ function handlePrint() {
       .sort((a, b) => a.group - b.group);
     if (subs.length === 0) continue;
 
-    const questionsHtml = cd.questions.map(q => `
-      <div class="q-row">
+    const allPrintQs = [
+      ...cd.questions,
+      ...(cd.presQ ? [{ label: '발표Q', text: cd.presQ, isPres: true }] : [])
+    ];
+    const questionsHtml = allPrintQs.map(q => {
+      const divider = q.isPres
+        ? `<div style="font-size:9px;font-weight:800;color:#FF6600;text-transform:uppercase;letter-spacing:.8px;margin:8px 0 6px;padding-top:6px;border-top:1px solid #E0E0E0">발표 질문</div>`
+        : (q.label === '추가Q1' ? `<div style="font-size:9px;font-weight:800;color:#aaa;text-transform:uppercase;letter-spacing:.8px;margin:8px 0 6px;padding-top:6px;border-top:1px solid #E0E0E0">추가 토의</div>` : '');
+      return `${divider}<div class="q-row">
         <span class="q-lbl">${q.label}</span>
         <span class="q-txt">${q.text}</span>
-      </div>`).join('');
+      </div>`;
+    }).join('');
 
     const subsHtml = subs.map(sub => {
       const answers = sub.answers || {};
-      const qaHtml = cd.questions
+      const qaHtml = allPrintQs
         .filter(q => answers[q.label])
-        .map(q => `
-          <div class="ans-row">
+        .map(q => {
+          const divider = q.isPres
+            ? `<div style="font-size:9px;font-weight:800;color:#FF6600;text-transform:uppercase;letter-spacing:.8px;margin:6px 0 4px;padding-top:4px;border-top:1px solid #F0F0F0">발표 질문</div>`
+            : (q.label === '추가Q1' ? `<div style="font-size:9px;font-weight:800;color:#aaa;text-transform:uppercase;letter-spacing:.8px;margin:6px 0 4px;padding-top:4px;border-top:1px solid #F0F0F0">추가 토의</div>` : '');
+          return `${divider}<div class="ans-row">
             <span class="ans-lbl">${q.label}</span>
             <p class="ans-txt">${answers[q.label].replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/\n/g,'<br>')}</p>
-          </div>`).join('');
+          </div>`;
+        }).join('');
       return `
         <div class="sub-card">
           <div class="sub-card-hd">

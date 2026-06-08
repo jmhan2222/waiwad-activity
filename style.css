@@ -397,6 +397,15 @@ body {
   height: 1px;
   background: var(--border);
 }
+.pres-divider {
+  color: var(--orange) !important;
+  font-weight: 900 !important;
+}
+.pres-divider::before,
+.pres-divider::after {
+  background: var(--orange) !important;
+  opacity: 0.35;
+}
 .submit-btn {
   margin: 0 14px;
   width: calc(100% - 28px);
