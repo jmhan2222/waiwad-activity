@@ -453,6 +453,138 @@ function toggleCaseSection(caseKey) {
   section.classList.toggle('collapsed');
 }
 
+// ===== PRINT / SAVE =====
+function handlePrint() {
+  const count = storage.getGroupCount();
+  const now = new Date();
+  const dateStr = now.toLocaleDateString('ko-KR', { year: 'numeric', month: 'long', day: 'numeric' });
+  const timeStr = now.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' });
+
+  let caseSectionsHtml = '';
+  for (const caseKey of ['A', 'B', 'C']) {
+    const cd = CASES[caseKey];
+    const subs = storage.getAllSubmissions(count)
+      .filter(s => s.caseKey === caseKey)
+      .sort((a, b) => a.group - b.group);
+    if (subs.length === 0) continue;
+
+    const questionsHtml = cd.questions.map(q => `
+      <div class="q-row">
+        <span class="q-lbl">${q.label}</span>
+        <span class="q-txt">${q.text}</span>
+      </div>`).join('');
+
+    const subsHtml = subs.map(sub => {
+      const answers = sub.answers || {};
+      const qaHtml = cd.questions
+        .filter(q => answers[q.label])
+        .map(q => `
+          <div class="ans-row">
+            <span class="ans-lbl">${q.label}</span>
+            <p class="ans-txt">${answers[q.label].replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/\n/g,'<br>')}</p>
+          </div>`).join('');
+      return `
+        <div class="sub-card">
+          <div class="sub-card-hd">
+            <strong>${sub.group}조</strong>
+            <span>${formatTime(sub.submittedAt)} 제출</span>
+          </div>
+          <div class="sub-card-body">${qaHtml || '<p style="color:#aaa;font-size:11px">답변 없음</p>'}</div>
+        </div>`;
+    }).join('');
+
+    caseSectionsHtml += `
+      <div class="case-block">
+        <div class="case-hd">
+          <span class="case-badge-p">Case ${caseKey}</span>
+          <div class="case-title-p">${cd.subtitle}</div>
+          <div class="case-route-p">${cd.route}</div>
+        </div>
+        <div class="section-block">
+          <div class="sec-lbl">시나리오</div>
+          <p class="scenario-p">${cd.scenario}</p>
+        </div>
+        <div class="section-block">
+          <div class="sec-lbl">토의 질문</div>
+          <div class="q-list">${questionsHtml}</div>
+        </div>
+        <div class="section-block">
+          <div class="sec-lbl">제출 답변 · ${subs.length}개</div>
+          ${subsHtml}
+        </div>
+      </div>`;
+  }
+
+  if (!caseSectionsHtml) {
+    showToast('아직 제출된 답변이 없습니다');
+    return;
+  }
+
+  const html = `<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>제주항공 객실서비스 교육 결과 · ${dateStr}</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,'Apple SD Gothic Neo','Noto Sans KR',sans-serif;
+  color:#1A1A1A;font-size:12px;line-height:1.65;padding:28px;max-width:860px;margin:0 auto}
+.print-hd{display:flex;align-items:center;gap:14px;
+  border-bottom:2.5px solid #FF6600;padding-bottom:14px;margin-bottom:28px}
+.print-hd-icon{font-size:30px;color:#FF6600}
+.print-hd-text h1{font-size:18px;font-weight:800;color:#FF6600;letter-spacing:1px}
+.print-hd-text p{font-size:11px;color:#666;margin-top:3px}
+.case-block{margin-bottom:32px;border:1.5px solid #E0E0E0;border-radius:8px;overflow:hidden;page-break-inside:avoid}
+.case-hd{background:#FF6600;color:white;padding:12px 16px}
+.case-badge-p{font-size:9px;font-weight:800;background:rgba(255,255,255,.25);
+  padding:2px 8px;border-radius:12px;display:inline-block;margin-bottom:5px;letter-spacing:.5px}
+.case-title-p{font-size:13px;font-weight:700;line-height:1.4;margin-bottom:3px}
+.case-route-p{font-size:10px;opacity:.85}
+.section-block{padding:10px 16px;border-bottom:1px solid #F0F0F0}
+.section-block:last-child{border-bottom:none}
+.sec-lbl{font-size:9px;font-weight:800;color:#FF6600;text-transform:uppercase;letter-spacing:.8px;margin-bottom:7px}
+.scenario-p{font-size:11px;color:#333;line-height:1.8}
+.q-list{}
+.q-row{display:flex;gap:8px;padding:4px 0;border-bottom:1px solid #F8F8F8;align-items:flex-start}
+.q-row:last-child{border-bottom:none}
+.q-lbl{font-size:9px;font-weight:800;color:#FF6600;min-width:38px;white-space:nowrap;padding-top:1px;flex-shrink:0}
+.q-txt{font-size:11px;color:#333}
+.sub-card{border:1px solid #E8E8E8;border-radius:6px;margin-bottom:8px;overflow:hidden}
+.sub-card:last-child{margin-bottom:0}
+.sub-card-hd{display:flex;justify-content:space-between;align-items:center;
+  background:#F7F7F7;padding:6px 10px;font-size:11px;border-bottom:1px solid #EBEBEB}
+.sub-card-hd strong{font-weight:800;font-size:12px}
+.sub-card-hd span{color:#999;font-size:10px}
+.sub-card-body{padding:8px 10px}
+.ans-row{display:flex;gap:8px;padding:5px 0;border-bottom:1px solid #F8F8F8;align-items:flex-start}
+.ans-row:last-child{border-bottom:none}
+.ans-lbl{font-size:9px;font-weight:800;color:#FF6600;min-width:38px;white-space:nowrap;padding-top:2px;flex-shrink:0}
+.ans-txt{font-size:11px;color:#333;line-height:1.65;margin:0}
+@media print{body{padding:0}.case-block{page-break-inside:avoid}}
+</style>
+</head>
+<body>
+<div class="print-hd">
+  <div class="print-hd-icon">✈</div>
+  <div class="print-hd-text">
+    <h1>JEJU AIR 객실서비스 교육</h1>
+    <p>조별 토의 활동 결과 &nbsp;·&nbsp; ${dateStr} ${timeStr} 저장</p>
+  </div>
+</div>
+${caseSectionsHtml}
+</body></html>`;
+
+  const win = window.open('', '_blank');
+  if (!win) {
+    showToast('팝업이 차단되었습니다. 브라우저에서 팝업을 허용해 주세요.');
+    return;
+  }
+  win.document.write(html);
+  win.document.close();
+  win.focus();
+  setTimeout(() => win.print(), 600);
+}
+
 function updateSyncStatus(ok) {
   const el = document.getElementById('refresh-countdown');
   if (el) el.textContent = ok ? '● 실시간 연결됨' : '○ 연결 중...';
@@ -537,6 +669,9 @@ document.addEventListener('DOMContentLoaded', () => {
       renderSubmissionCards();
     };
   });
+
+  // 저장 / 인쇄
+  document.getElementById('btn-save-all').onclick = handlePrint;
 
   // 수동 새로고침
   document.getElementById('btn-manual-refresh').onclick = () => {

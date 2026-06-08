@@ -451,6 +451,18 @@ body {
   cursor: pointer;
 }
 .btn-danger:active { background: #DC2626; }
+.btn-save {
+  background: var(--dark);
+  color: white;
+  border: none;
+  border-radius: var(--r-sm);
+  padding: 13px 20px;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.12s;
+}
+.btn-save:active { background: #333; }
 .full-width { width: 100%; }
 
 /* ===== FACILITATOR LOGIN ===== */
