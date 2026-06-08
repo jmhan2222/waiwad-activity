@@ -70,9 +70,9 @@ const storage = {
   getSubmission(group, caseKey) {
     return this.get(`activity:submission:${group}:${caseKey}`);
   },
-  setSubmission(group, caseKey, text) {
+  setSubmission(group, caseKey, answers) {
     this.set(`activity:submission:${group}:${caseKey}`, {
-      group, caseKey, text, submittedAt: new Date().toISOString()
+      group, caseKey, answers, submittedAt: new Date().toISOString()
     });
   },
   getAllSubmissions(maxGroup) {
@@ -205,24 +205,33 @@ function renderActivityContent() {
   // 제출 후에는 케이스 변경 불가
   document.getElementById('btn-change-case').style.display = existing ? 'none' : '';
 
-  const questionsHtml = cd.questions.map(q => `
-    <div class="question-item">
-      <span class="q-label">${q.label}</span>
-      <span class="q-text">${q.text}</span>
-    </div>
-  `).join('');
+  const mainQuestions = cd.questions.filter(q => !q.label.startsWith('추가'));
+  const extraQuestions = cd.questions.filter(q => q.label.startsWith('추가'));
+  const savedAnswers = existing ? (existing.answers || {}) : {};
 
-  const inputHtml = existing ? `
+  function qaBlockHtml(q) {
+    const saved = savedAnswers[q.label] || '';
+    return `
+      <div class="qa-block">
+        <div class="question-row">
+          <span class="q-label">${q.label}</span>
+          <span class="q-text">${q.text}</span>
+        </div>
+        <textarea
+          class="qa-textarea"
+          data-question="${q.label}"
+          placeholder="우리 조의 생각을 입력하세요..."
+        >${escapeHtml(saved)}</textarea>
+      </div>
+    `;
+  }
+
+  const submitBtnLabel = existing ? '다시 제출' : '제출하기';
+  const submittedBannerHtml = existing ? `
     <div class="submitted-banner">
-      제출 완료 ✓
-      <small>${formatTime(existing.submittedAt)} 제출</small>
+      제출 완료 ✓ <small>${formatTime(existing.submittedAt)} 제출</small>
     </div>
-    <textarea id="answer-input" class="answer-textarea">${escapeHtml(existing.text)}</textarea>
-    <button id="btn-submit" class="btn-primary full-width" style="margin-top:12px">다시 제출</button>
-  ` : `
-    <textarea id="answer-input" class="answer-textarea" placeholder="우리 조의 생각을 자유롭게 적어주세요..."></textarea>
-    <button id="btn-submit" class="btn-primary full-width" style="margin-top:12px">제출하기</button>
-  `;
+  ` : '';
 
   const main = document.getElementById('activity-main');
   main.innerHTML = `
@@ -238,15 +247,20 @@ function renderActivityContent() {
     </div>
 
     <div class="content-card">
-      <div class="card-label">토의 질문</div>
-      <div class="questions-list">${questionsHtml}</div>
+      <div class="card-label">토의 질문 · 답변</div>
+      ${submittedBannerHtml}
+      <div class="qa-list">
+        ${mainQuestions.map(qaBlockHtml).join('')}
+      </div>
+      ${extraQuestions.length ? `
+        <div class="extra-divider">추가 토의</div>
+        <div class="qa-list">
+          ${extraQuestions.map(qaBlockHtml).join('')}
+        </div>
+      ` : ''}
     </div>
 
-    <div class="content-card">
-      <div class="card-label">우리 조 생각</div>
-      ${inputHtml}
-    </div>
-
+    <button id="btn-submit" class="btn-primary full-width submit-btn">${submitBtnLabel}</button>
     <div style="height:24px"></div>
   `;
 
@@ -254,18 +268,27 @@ function renderActivityContent() {
 }
 
 function handleSubmit() {
-  const textarea = document.getElementById('answer-input');
-  const text = textarea.value.trim();
-  if (!text) {
-    textarea.classList.add('shake');
-    textarea.style.borderColor = '#EF4444';
-    setTimeout(() => {
-      textarea.classList.remove('shake');
-      textarea.style.borderColor = '';
-    }, 600);
+  const answers = {};
+  document.querySelectorAll('.qa-textarea').forEach(ta => {
+    const val = ta.value.trim();
+    if (val) answers[ta.dataset.question] = val;
+  });
+
+  if (Object.keys(answers).length === 0) {
+    const first = document.querySelector('.qa-textarea');
+    if (first) {
+      first.classList.add('shake');
+      first.style.borderColor = '#EF4444';
+      first.focus();
+      setTimeout(() => {
+        first.classList.remove('shake');
+        first.style.borderColor = '';
+      }, 600);
+    }
+    showToast('최소 한 개 이상 답변을 입력해 주세요');
     return;
   }
-  storage.setSubmission(state.currentGroup, state.currentCase, text);
+  storage.setSubmission(state.currentGroup, state.currentCase, answers);
   renderActivityContent();
   showToast('제출되었습니다!');
 }
@@ -325,16 +348,28 @@ function renderSubmissionCards() {
     return;
   }
 
-  container.innerHTML = filtered.map(sub => `
-    <div class="submission-card">
-      <div class="sub-header">
-        <span class="sub-group">${sub.group}조</span>
-        <span class="sub-case">Case ${sub.caseKey}</span>
-        <span class="sub-time">${formatTime(sub.submittedAt)}</span>
+  container.innerHTML = filtered.map(sub => {
+    const questions = CASES[sub.caseKey].questions;
+    const answers = sub.answers || {};
+    const qaHtml = questions
+      .filter(q => answers[q.label])
+      .map(q => `
+        <div class="sub-qa-item">
+          <span class="sub-q-label">${q.label}</span>
+          <p class="sub-q-answer">${escapeHtml(answers[q.label])}</p>
+        </div>
+      `).join('');
+    return `
+      <div class="submission-card">
+        <div class="sub-header">
+          <span class="sub-group">${sub.group}조</span>
+          <span class="sub-case">Case ${sub.caseKey}</span>
+          <span class="sub-time">${formatTime(sub.submittedAt)}</span>
+        </div>
+        <div class="sub-qa-list">${qaHtml || '<p class="sub-empty">답변 없음</p>'}</div>
       </div>
-      <p class="sub-text">${escapeHtml(sub.text)}</p>
-    </div>
-  `).join('');
+    `;
+  }).join('');
 }
 
 function startRefreshTimer() {
