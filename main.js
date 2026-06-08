@@ -297,7 +297,7 @@ function renderActivityContent() {
       ` : ''}
     </div>
 
-    <button id="btn-submit" class="btn-primary full-width submit-btn">${submitBtnLabel}</button>
+    <button id="btn-submit" class="btn-primary submit-btn">${submitBtnLabel}</button>
     <div style="height:24px"></div>
   `;
 
