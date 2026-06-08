@@ -30,17 +30,32 @@
     </div>
   </div>
 
+  <!-- ===== 케이스 선택 화면 ===== -->
+  <div id="screen-case-select" class="screen">
+    <header class="main-header">
+      <button id="btn-back-from-case" class="btn-header-back">‹</button>
+      <div class="logo-text" style="flex:1; margin-left:10px">
+        <span id="case-select-group-name" class="brand">1조</span>
+        <span class="brand-sub">케이스 선택</span>
+      </div>
+    </header>
+    <main class="case-select-main">
+      <h2 class="select-title">토의할 케이스를 선택하세요</h2>
+      <p class="select-desc">한 가지 케이스를 선택하여 토의합니다</p>
+      <div class="case-select-grid" id="case-select-grid"></div>
+    </main>
+  </div>
+
   <!-- ===== 활동 화면 ===== -->
   <div id="screen-activity" class="screen">
     <header class="activity-header">
       <div class="activity-top-row">
         <button id="btn-back-to-groups" class="btn-icon-back">‹</button>
-        <span id="activity-group-label" class="activity-group-label">1조</span>
-      </div>
-      <div class="case-tabs" id="case-tabs">
-        <button class="case-tab" data-case="A">Case A</button>
-        <button class="case-tab" data-case="B">Case B</button>
-        <button class="case-tab" data-case="C">Case C</button>
+        <div class="activity-labels">
+          <span id="activity-group-label" class="activity-group-name">1조</span>
+          <span id="activity-case-label" class="activity-case-badge">Case A</span>
+        </div>
+        <button id="btn-change-case" class="btn-change-case">케이스 변경</button>
       </div>
     </header>
     <main id="activity-main" class="activity-main"></main>
@@ -69,7 +84,8 @@
     </header>
 
     <div class="facilitator-scroll">
-      <section class="f-section group-count-section">
+      <!-- 조 수 설정 -->
+      <section class="f-section">
         <div class="f-section-label">오늘 교육 조 수 설정</div>
         <div id="group-count-buttons" class="count-btn-group">
           <button class="count-btn" data-count="1">1조</button>
@@ -81,7 +97,14 @@
         <p id="group-count-display" class="count-display"></p>
       </section>
 
-      <section class="f-section filter-section">
+      <!-- 조별 현황 -->
+      <section class="f-section">
+        <div class="f-section-label">조별 현황</div>
+        <div id="group-status-row" class="group-status-row"></div>
+      </section>
+
+      <!-- 케이스 필터 -->
+      <section class="f-section">
         <div class="f-section-label">케이스 필터</div>
         <div class="filter-row">
           <button class="filter-btn active" data-filter="all">전체</button>
@@ -91,8 +114,10 @@
         </div>
       </section>
 
+      <!-- 제출 카드 -->
       <div id="facilitator-cards" class="facilitator-cards"></div>
 
+      <!-- 하단 버튼 -->
       <div class="facilitator-bottom">
         <p id="refresh-countdown" class="refresh-text">30초 후 자동 새로고침</p>
         <button id="btn-manual-refresh" class="btn-ghost full-width">지금 새로고침</button>

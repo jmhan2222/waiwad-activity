@@ -1,7 +1,6 @@
 // ===== CASES DATA =====
 const CASES = {
   A: {
-    title: 'Case A',
     subtitle: '난기류 상황인데, 지금 라면 드려도 될까요?',
     route: '인천 → 도쿄 나리타 / 만석 / Seat Belt Sign On',
     scenario: '에어카페 Cart 서비스 중 30C 승객 신라면 주문에 뜨거운 물을 붓던 찰나 Fasten Seat Belt Sign 점등 및 난기류 발생. 승객(30C) "저 에어카페 라면 주문한 것 좀 빨리 가져다 주세요. 배가 많이 고파서요." 전방 승무원들도 착석 상태 유지 중. 30C 승객은 짜증난 표정으로 After Galley 주시 중.',
@@ -16,7 +15,6 @@ const CASES = {
     ]
   },
   B: {
-    title: 'Case B',
     subtitle: '제 기내식 먼저 주시겠어요?',
     route: '비엔티안 → 인천 / 만석 / 사전기내식 40ea / 에어카페 서비스 중',
     scenario: '어린 아이를 동반한 3D 승객이 조심스럽게 사무장을 찾는다. 승객(3D) "저.. 혹시 예약한 기내식 좀 먼저 주시겠어요? 애가 계속 배고프다고 하고, 저희 시부모님도 아까 저녁 식사를 못하셔서요." 한편 15A 승객이 손을 번쩍 들며 FR을 부른다. 승객(15A) "저 아까 맥주 한 캔 사먹었는데 (딸꾹), 똑같은 걸로 한 캔 더 주세요." 얼굴이 붉어져 있으며 딸꾹질이 멈추지 않는 등 취기가 상당히 느껴진다.',
@@ -31,7 +29,6 @@ const CASES = {
     ]
   },
   C: {
-    title: 'Case C',
     subtitle: '이 상황은 무엇이 먼저이고, 어디까지 해드릴 수 있을까요?',
     route: '인천 → 싱가포르 / 장거리 국제선 / 주간편 / Boarding 시점',
     scenario: 'Boarding 중 사무장(이감귤)은 비즈니스라이트 승객 Welcome Greeting과 짐 정리에 분주하다. 승객(1A) "제 가방 그냥 바닥에 둬도 되죠? 안되면 위로 올려주세요" 승객(2D) "저 배고파서 그런데, 신라면이랑 비빔밥 좀 먼저 살게요." 승객(3A) "저 몸이 좀 안좋아서 그런데.. 기내에 약 있어요?" 이때 탑승권을 검사하던 FR 승무원이 손님이 탑승권을 잃어버렸다며 다급하게 사무장을 찾는다. 동시에 AR 승무원(강제코)이 난처한 표정으로 "사무장님, 24D 손님이 지난번에 비행기 탔을 때 춥다고 하니 승무원이 담요를 빌려주었다며 이번에도 담요를 달라고 하시는데, 어떻게 할까요?"',
@@ -61,6 +58,15 @@ const storage = {
   setGroupCount(n) {
     this.set('activity:groupCount', n);
   },
+  getGroupCase(group) {
+    return this.get(`activity:groupCase:${group}`);
+  },
+  setGroupCase(group, caseKey) {
+    this.set(`activity:groupCase:${group}`, caseKey);
+  },
+  clearGroupCase(group) {
+    localStorage.removeItem(`activity:groupCase:${group}`);
+  },
   getSubmission(group, caseKey) {
     return this.get(`activity:submission:${group}:${caseKey}`);
   },
@@ -69,22 +75,19 @@ const storage = {
       group, caseKey, text, submittedAt: new Date().toISOString()
     });
   },
-  hasAnySubmission(group) {
-    return ['A', 'B', 'C'].some(c => !!this.getSubmission(group, c));
-  },
   getAllSubmissions(maxGroup) {
     const result = [];
     for (let g = 1; g <= maxGroup; g++) {
-      for (const c of ['A', 'B', 'C']) {
-        const sub = this.getSubmission(g, c);
-        if (sub) result.push(sub);
-      }
+      const caseKey = this.getGroupCase(g);
+      if (!caseKey) continue;
+      const sub = this.getSubmission(g, caseKey);
+      if (sub) result.push(sub);
     }
     return result;
   },
   clearAll() {
     Object.keys(localStorage)
-      .filter(k => k.startsWith('activity:submission:'))
+      .filter(k => k.startsWith('activity:submission:') || k.startsWith('activity:groupCase:'))
       .forEach(k => localStorage.removeItem(k));
   }
 };
@@ -92,7 +95,7 @@ const storage = {
 // ===== APP STATE =====
 const state = {
   currentGroup: null,
-  currentCase: 'A',
+  currentCase: null,
   facilitatorFilter: 'all',
   refreshTimer: null,
   refreshCountdown: 30,
@@ -132,45 +135,75 @@ function renderGroupSelect() {
   const container = document.getElementById('group-buttons');
   container.innerHTML = '';
   for (let i = 1; i <= count; i++) {
-    const submitted = storage.hasAnySubmission(i);
-    const caseDone = ['A', 'B', 'C'].filter(c => storage.getSubmission(i, c)).length;
+    const selectedCase = storage.getGroupCase(i);
+    const submitted = selectedCase ? !!storage.getSubmission(i, selectedCase) : false;
     const btn = document.createElement('button');
-    btn.className = 'group-btn' + (submitted ? ' submitted' : '');
+    btn.className = 'group-btn' + (submitted ? ' submitted' : selectedCase ? ' case-selected' : '');
     btn.innerHTML = `
       <span class="group-num">${i}조</span>
-      ${submitted ? `<span class="group-progress">${caseDone}/3</span>` : ''}
+      ${selectedCase ? `<span class="group-case-badge case-${selectedCase}">Case ${selectedCase}</span>` : ''}
+      ${submitted ? '<span class="group-check">✓</span>' : ''}
     `;
     btn.onclick = () => enterGroup(i);
     container.appendChild(btn);
   }
 }
 
-// ===== ACTIVITY SCREEN =====
+// ===== CASE SELECT SCREEN =====
 function enterGroup(groupNum) {
   state.currentGroup = groupNum;
-  state.currentCase = 'A';
-  document.getElementById('activity-group-label').textContent = `${groupNum}조`;
-  renderCaseTabs();
+  const savedCase = storage.getGroupCase(groupNum);
+
+  if (savedCase) {
+    // 이미 케이스가 선택되어 있으면 바로 활동 화면으로
+    state.currentCase = savedCase;
+    renderActivityContent();
+    showScreen('screen-activity');
+  } else {
+    // 케이스 선택 화면으로
+    document.getElementById('case-select-group-name').textContent = `${groupNum}조`;
+    renderCaseSelectGrid();
+    showScreen('screen-case-select');
+  }
+}
+
+function renderCaseSelectGrid() {
+  const container = document.getElementById('case-select-grid');
+  container.innerHTML = ['A', 'B', 'C'].map(key => {
+    const cd = CASES[key];
+    return `
+      <button class="case-option-card" data-case="${key}">
+        <div class="case-option-badge">Case ${key}</div>
+        <div class="case-option-title">${cd.subtitle}</div>
+        <div class="case-option-route">${cd.route.split(' / ')[0]}</div>
+      </button>
+    `;
+  }).join('');
+
+  container.querySelectorAll('.case-option-card').forEach(card => {
+    card.onclick = () => selectCase(card.dataset.case);
+  });
+}
+
+function selectCase(caseKey) {
+  storage.setGroupCase(state.currentGroup, caseKey);
+  state.currentCase = caseKey;
   renderActivityContent();
   showScreen('screen-activity');
 }
 
-function renderCaseTabs() {
-  document.querySelectorAll('.case-tab').forEach(tab => {
-    const c = tab.dataset.case;
-    const sub = storage.getSubmission(state.currentGroup, c);
-    const isActive = c === state.currentCase;
-    tab.className = 'case-tab' +
-      (isActive ? ' active' : '') +
-      (sub ? ' done' : '');
-    tab.innerHTML = `Case ${c}${sub ? ' ✓' : ''}`;
-  });
-}
-
+// ===== ACTIVITY SCREEN =====
 function renderActivityContent() {
-  const cd = CASES[state.currentCase];
-  const existing = storage.getSubmission(state.currentGroup, state.currentCase);
-  const main = document.getElementById('activity-main');
+  const g = state.currentGroup;
+  const c = state.currentCase;
+  const cd = CASES[c];
+  const existing = storage.getSubmission(g, c);
+
+  // 헤더 업데이트
+  document.getElementById('activity-group-label').textContent = `${g}조`;
+  document.getElementById('activity-case-label').textContent = `Case ${c}`;
+  // 제출 후에는 케이스 변경 불가
+  document.getElementById('btn-change-case').style.display = existing ? 'none' : '';
 
   const questionsHtml = cd.questions.map(q => `
     <div class="question-item">
@@ -180,7 +213,10 @@ function renderActivityContent() {
   `).join('');
 
   const inputHtml = existing ? `
-    <div class="submitted-banner">제출 완료 ✓  <small>${formatTime(existing.submittedAt)} 제출</small></div>
+    <div class="submitted-banner">
+      제출 완료 ✓
+      <small>${formatTime(existing.submittedAt)} 제출</small>
+    </div>
     <textarea id="answer-input" class="answer-textarea">${escapeHtml(existing.text)}</textarea>
     <button id="btn-submit" class="btn-primary full-width" style="margin-top:12px">다시 제출</button>
   ` : `
@@ -188,9 +224,10 @@ function renderActivityContent() {
     <button id="btn-submit" class="btn-primary full-width" style="margin-top:12px">제출하기</button>
   `;
 
+  const main = document.getElementById('activity-main');
   main.innerHTML = `
-    <div class="case-hero">
-      <div class="case-hero-badge">Case ${state.currentCase}</div>
+    <div class="case-hero case-hero-${c}">
+      <div class="case-hero-badge">Case ${c}</div>
       <h2 class="case-hero-title">${cd.subtitle}</h2>
       <div class="case-hero-route">${cd.route}</div>
     </div>
@@ -229,7 +266,6 @@ function handleSubmit() {
     return;
   }
   storage.setSubmission(state.currentGroup, state.currentCase, text);
-  renderCaseTabs();
   renderActivityContent();
   showToast('제출되었습니다!');
 }
@@ -237,7 +273,7 @@ function handleSubmit() {
 // ===== FACILITATOR SCREEN =====
 function renderFacilitator() {
   renderGroupCountButtons();
-  renderSubmissionCards();
+  renderFacilitatorContent();
   startRefreshTimer();
 }
 
@@ -249,6 +285,30 @@ function renderGroupCountButtons() {
   document.getElementById('group-count-display').textContent = `현재 설정: ${count}조`;
 }
 
+function renderFacilitatorContent() {
+  renderGroupStatusRow();
+  renderSubmissionCards();
+}
+
+function renderGroupStatusRow() {
+  const count = storage.getGroupCount();
+  const container = document.getElementById('group-status-row');
+  let html = '';
+  for (let g = 1; g <= count; g++) {
+    const selectedCase = storage.getGroupCase(g);
+    const submitted = selectedCase ? !!storage.getSubmission(g, selectedCase) : false;
+    const cls = submitted ? 'status-chip done' : selectedCase ? 'status-chip selected' : 'status-chip pending';
+    html += `
+      <div class="${cls}">
+        <span class="chip-group">${g}조</span>
+        <span class="chip-case">${selectedCase ? `Case ${selectedCase}` : '—'}</span>
+        ${submitted ? '<span class="chip-check">✓</span>' : ''}
+      </div>
+    `;
+  }
+  container.innerHTML = html;
+}
+
 function renderSubmissionCards() {
   const count = storage.getGroupCount();
   const all = storage.getAllSubmissions(count);
@@ -256,7 +316,7 @@ function renderSubmissionCards() {
     ? all
     : all.filter(s => s.caseKey === state.facilitatorFilter);
 
-  filtered.sort((a, b) => a.group - b.group || a.caseKey.localeCompare(b.caseKey));
+  filtered.sort((a, b) => a.group - b.group);
 
   const container = document.getElementById('facilitator-cards');
 
@@ -285,7 +345,7 @@ function startRefreshTimer() {
     state.refreshCountdown--;
     updateCountdown();
     if (state.refreshCountdown <= 0) {
-      renderSubmissionCards();
+      renderFacilitatorContent();
       state.refreshCountdown = 30;
     }
   }, 1000);
@@ -314,21 +374,25 @@ document.addEventListener('DOMContentLoaded', () => {
     showScreen('screen-facilitator-login');
   };
 
+  // 케이스 선택 화면 뒤로가기
+  document.getElementById('btn-back-from-case').onclick = () => {
+    showScreen('screen-group-select');
+  };
+
   // 활동 화면 뒤로가기
   document.getElementById('btn-back-to-groups').onclick = () => {
     renderGroupSelect();
     showScreen('screen-group-select');
   };
 
-  // 케이스 탭
-  document.querySelectorAll('.case-tab').forEach(tab => {
-    tab.onclick = () => {
-      state.currentCase = tab.dataset.case;
-      renderCaseTabs();
-      renderActivityContent();
-      document.getElementById('activity-main').scrollTop = 0;
-    };
-  });
+  // 케이스 변경 버튼 (미제출 상태에서만 표시됨)
+  document.getElementById('btn-change-case').onclick = () => {
+    storage.clearGroupCase(state.currentGroup);
+    state.currentCase = null;
+    document.getElementById('case-select-group-name').textContent = `${state.currentGroup}조`;
+    renderCaseSelectGrid();
+    showScreen('screen-case-select');
+  };
 
   // 비밀번호 확인
   const pwConfirm = () => {
@@ -364,7 +428,7 @@ document.addEventListener('DOMContentLoaded', () => {
     btn.onclick = () => {
       storage.setGroupCount(parseInt(btn.dataset.count));
       renderGroupCountButtons();
-      renderSubmissionCards();
+      renderFacilitatorContent();
     };
   });
 
@@ -380,16 +444,16 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // 수동 새로고침
   document.getElementById('btn-manual-refresh').onclick = () => {
-    renderSubmissionCards();
+    renderFacilitatorContent();
     state.refreshCountdown = 30;
     updateCountdown();
   };
 
   // 전체 초기화
   document.getElementById('btn-reset-all').onclick = () => {
-    if (confirm('모든 조의 제출 답변을 초기화하시겠습니까?\n이 작업은 되돌릴 수 없습니다.')) {
+    if (confirm('모든 조의 케이스 선택과 제출 답변을 초기화하시겠습니까?\n이 작업은 되돌릴 수 없습니다.')) {
       storage.clearAll();
-      renderSubmissionCards();
+      renderFacilitatorContent();
       showToast('초기화되었습니다');
     }
   };
