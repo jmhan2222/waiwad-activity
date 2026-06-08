@@ -3,7 +3,7 @@ const CASES = {
   A: {
     subtitle: '난기류 상황인데, 지금 라면 드려도 될까요?',
     route: '인천 → 도쿄 나리타 / 만석 / Seat Belt Sign On',
-    scenario: '에어카페 Cart 서비스 중 30C 승객 신라면 주문에 뜨거운 물을 붓던 찰나 Fasten Seat Belt Sign 점등 및 난기류 발생. 승객(30C) "저 에어카페 라면 주문한 것 좀 빨리 가져다 주세요. 배가 많이 고파서요." 전방 승무원들도 착석 상태 유지 중. 30C 승객은 짜증난 표정으로 After Galley 주시 중.',
+    scenario: '에어카페 Cart 서비스 중 30C 승객 신라면 주문에 뜨거운 물을 붓던 찰나 Fasten Seat Belt Sign 점등 및 난기류 발생. 승객(30C) "저 라면 주문한 것 좀 빨리 가져다 주세요. 배가 많이 고파서요." 전방 승무원들도 착석 상태 유지 중. 30C 승객은 짜증난 표정으로 AFT Galley 주시 중.',
     questions: [
       { label: 'Q1', text: '여러분이 생각하는 업무의 우선 순위는 무엇입니까?' },
       { label: 'Q2', text: '만약 당신이 사무장이라면 어떻게 지시하겠습니까?' },
