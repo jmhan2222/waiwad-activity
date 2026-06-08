@@ -44,61 +44,89 @@ const CASES = {
   }
 };
 
+// ===== FIREBASE =====
+const firebaseConfig = {
+  apiKey: "AIzaSyBWUn0QYb5036L3Jl5s2Yz2rOb5aGCd_Ks",
+  authDomain: "waiwad-activity.firebaseapp.com",
+  databaseURL: "https://waiwad-activity-default-rtdb.firebaseio.com",
+  projectId: "waiwad-activity",
+  storageBucket: "waiwad-activity.firebasestorage.app",
+  messagingSenderId: "645659474342",
+  appId: "1:645659474342:web:8e12e2e2a58acb83993767"
+};
+firebase.initializeApp(firebaseConfig);
+const db = firebase.database();
+
+// 로컬 미러 — Firebase 리스너가 항상 최신 상태로 유지
+const appData = { groupCount: 5, groupCase: {}, submission: {} };
+
 // ===== STORAGE =====
 const storage = {
-  get(key) {
-    try { return JSON.parse(localStorage.getItem(key)); } catch { return null; }
-  },
-  set(key, value) {
-    localStorage.setItem(key, JSON.stringify(value));
-  },
-  getGroupCount() {
-    return this.get('activity:groupCount') || 5;
-  },
+  getGroupCount() { return appData.groupCount; },
   setGroupCount(n) {
-    this.set('activity:groupCount', n);
+    appData.groupCount = n;
+    db.ref('activity/groupCount').set(n);
   },
-  getGroupCase(group) {
-    return this.get(`activity:groupCase:${group}`);
-  },
+  getGroupCase(group) { return (appData.groupCase || {})[group] || null; },
   setGroupCase(group, caseKey) {
-    this.set(`activity:groupCase:${group}`, caseKey);
+    if (!appData.groupCase) appData.groupCase = {};
+    appData.groupCase[group] = caseKey;
+    db.ref(`activity/groupCase/${group}`).set(caseKey);
   },
   clearGroupCase(group) {
-    localStorage.removeItem(`activity:groupCase:${group}`);
+    if (appData.groupCase) delete appData.groupCase[group];
+    db.ref(`activity/groupCase/${group}`).remove();
   },
   getSubmission(group, caseKey) {
-    return this.get(`activity:submission:${group}:${caseKey}`);
+    return ((appData.submission || {})[group] || {})[caseKey] || null;
   },
   setSubmission(group, caseKey, answers) {
-    this.set(`activity:submission:${group}:${caseKey}`, {
-      group, caseKey, answers, submittedAt: new Date().toISOString()
-    });
+    const data = { group, caseKey, answers, submittedAt: new Date().toISOString() };
+    if (!appData.submission[group]) appData.submission[group] = {};
+    appData.submission[group][caseKey] = data;
+    db.ref(`activity/submission/${group}/${caseKey}`).set(data);
   },
   getAllSubmissions(maxGroup) {
     const result = [];
     for (let g = 1; g <= maxGroup; g++) {
-      const caseKey = this.getGroupCase(g);
+      const caseKey = (appData.groupCase || {})[g];
       if (!caseKey) continue;
-      const sub = this.getSubmission(g, caseKey);
+      const sub = ((appData.submission || {})[g] || {})[caseKey];
       if (sub) result.push(sub);
     }
     return result;
   },
   clearAll() {
-    Object.keys(localStorage)
-      .filter(k => k.startsWith('activity:submission:') || k.startsWith('activity:groupCase:'))
-      .forEach(k => localStorage.removeItem(k));
+    appData.groupCase = {};
+    appData.submission = {};
+    db.ref('activity/groupCase').remove();
+    db.ref('activity/submission').remove();
   }
 };
+
+// ===== FIREBASE REAL-TIME LISTENER =====
+function setupFirebaseListeners() {
+  db.ref('activity').on('value', snap => {
+    const data = snap.val() || {};
+    appData.groupCount  = data.groupCount  || 5;
+    appData.groupCase   = data.groupCase   || {};
+    appData.submission  = data.submission  || {};
+    refreshCurrentView();
+  });
+}
+
+function refreshCurrentView() {
+  const active = document.querySelector('.screen.active')?.id;
+  if (active === 'screen-group-select') renderGroupSelect();
+  else if (active === 'screen-facilitator') renderFacilitatorContent();
+  // 활동 화면은 입력 중이므로 자동 갱신 안 함
+}
 
 // ===== APP STATE =====
 const state = {
   currentGroup: null,
   currentCase: null,
   facilitatorFilter: 'all',
-  refreshTimer: null,
-  refreshCountdown: 30,
 };
 
 // ===== UTILITIES =====
@@ -297,7 +325,7 @@ function handleSubmit() {
 function renderFacilitator() {
   renderGroupCountButtons();
   renderFacilitatorContent();
-  startRefreshTimer();
+  updateSyncStatus(true);
 }
 
 function renderGroupCountButtons() {
@@ -425,34 +453,15 @@ function toggleCaseSection(caseKey) {
   section.classList.toggle('collapsed');
 }
 
-function startRefreshTimer() {
-  stopRefreshTimer();
-  state.refreshCountdown = 30;
-  updateCountdown();
-  state.refreshTimer = setInterval(() => {
-    state.refreshCountdown--;
-    updateCountdown();
-    if (state.refreshCountdown <= 0) {
-      renderFacilitatorContent();
-      state.refreshCountdown = 30;
-    }
-  }, 1000);
-}
-
-function stopRefreshTimer() {
-  if (state.refreshTimer) {
-    clearInterval(state.refreshTimer);
-    state.refreshTimer = null;
-  }
-}
-
-function updateCountdown() {
+function updateSyncStatus(ok) {
   const el = document.getElementById('refresh-countdown');
-  if (el) el.textContent = `${state.refreshCountdown}초 후 자동 새로고침`;
+  if (el) el.textContent = ok ? '● 실시간 연결됨' : '○ 연결 중...';
+  if (el) el.style.color = ok ? '#22C55E' : '#999';
 }
 
 // ===== INIT =====
 document.addEventListener('DOMContentLoaded', () => {
+  setupFirebaseListeners();
   renderGroupSelect();
 
   // 진행자 화면 진입
@@ -506,7 +515,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // 진행자 나가기
   document.getElementById('btn-facilitator-exit').onclick = () => {
-    stopRefreshTimer();
     renderGroupSelect();
     showScreen('screen-group-select');
   };
@@ -533,8 +541,6 @@ document.addEventListener('DOMContentLoaded', () => {
   // 수동 새로고침
   document.getElementById('btn-manual-refresh').onclick = () => {
     renderFacilitatorContent();
-    state.refreshCountdown = 30;
-    updateCountdown();
   };
 
   // 전체 초기화
